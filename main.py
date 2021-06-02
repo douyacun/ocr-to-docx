@@ -41,5 +41,5 @@ def font_size(bbox):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     # print_hi()
-    # debug("/Users/liuning/Desktop/a.png")
-    font_size(([30, 29], [521, 29], [521, 107], [30, 107]))
+    debug("/Users/liuning/Desktop/a.png")
+    # font_size(([30, 29], [521, 29], [521, 107], [30, 107]))
