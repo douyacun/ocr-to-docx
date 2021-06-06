@@ -1,7 +1,6 @@
 import easyocr
 from docx import Document
 from docx.shared import Pt
-from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml.ns import qn
 
 
@@ -35,11 +34,7 @@ def read_image(filepath: str):
         print(v)
 
 
-# 1. 统一字体，判断字体大小？
-# 2. 行间距
-# 3. 横间距缩进
-# 4. 标点符号，转中文
-def debug(filepath: str):
+def detect_text(filepath: str):
     reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
     result = reader.readtext(filepath)
 
@@ -51,30 +46,62 @@ def debug(filepath: str):
 
     parag = doc.add_paragraph()
 
-    # font_styles = doc.styles
-    # font_charstyle = font_styles.add_style('CommentsStyle', WD_STYLE_TYPE.CHARACTER)
-    # font_object = font_charstyle.font
-    # font_object.size = Pt(12)
-    # font_object.name = u'宋体'
-    # lineSpace = 0
-    # paragraphSpace = 0
+    lines = merge_line(result)
+    print(merge_line(result))
+
+    for line in lines:
+        parag.add_run(line).add_break()
+
+    doc.save("demo.docx")
+
+
+# 1. 统一字体，判断字体大小？
+# 2. 行间距
+# 3. 横间距缩进
+# 4. 标点符号，转中文
+def debug(filepath: str):
+    reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
+    result = reader.readtext(filepath)
 
     for i in range(len(result)):
         (bbox, text, prob) = result[i]
-        (topY, bottomY) = parse_pos(bbox)
-        (preBbox, preText, preProb) = result[i - 1]
-        (preTopY, preBottomY) = parse_pos(preBbox)
-        print(f'text: {text} topY: {topY} bottomY:{bottomY}" preTopY: {preTopY} preBottomY: {preBottomY}')
+        print(f'text: {text} bbox: {bbox}')
 
+
+def merge_line(res):
+    """
+    合并同一行
+    1. 判断是否位同一行, 同一行：topY <= preBottomY
+    2. 判断是否需要换行，本行最后一个字没有达到最右侧边界
+    3. 首行缩进？居中？
+    """
+    lineList = list()
+    line = ""
+    border = parse_border(res)
+    print(f"border: {border}")
+
+    for i in range(len(res)):
+        (bbox, text, prob) = res[i]
+        pos = parse_pos(bbox)
+        prePos = parse_pos(res[i - 1][0])
+        print(f"text: {text} pos: {pos}  prePos: {prePos}")
         if i == 0:
-            run = parag.add_run(text)
-            run.font.size = Pt(20)
+            line = text
         else:
-            if topY > preBottomY:
-                parag.add_run().add_break()
-                parag.add_run(str(text))
+            # 在图片中可以确认是统一行
+            if pos["topY"] <= prePos["topY"] + 2 or pos["bottomY"] <= prePos["bottomY"] + 2:
+                line += text
+            else:
+                # 确定是否需要换行
+                if prePos["rightX"] >= border["right"]:
+                    line += text
+                else:
+                    lineList.append(line)
+                    line = text
+    if line != "":
+        lineList.append(line)
 
-    doc.save("demo.docx")
+    return lineList
 
 
 def parse_pos(bbox) -> dict:
@@ -89,12 +116,30 @@ def parse_pos(bbox) -> dict:
     return res
 
 
-def page_border(res):
+# 左右边界
+def parse_border(res):
+    border = dict()
+    if len(res) == 0:
+        return border
+
+    right = 0
+    left = 0
+    for i in range(len(res)):
+        (bbox, text, prob) = res[i]
+        (top_left, top_right, bottom_right, bottom_left) = bbox
+        if i == 0:
+            left = top_left[0]
+        right = max(right, top_right[0], bottom_right[0])
+        left = min(left, top_left[0], bottom_left[0])
+
+    border["left"] = left - 2
+    border["right"] = right - 2
+    return border
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     # print_hi()
-    # debug("/Users/admin/Desktop/c.png")
-    debug("/Users/liuning/Desktop/d.png")
+    # detect_text("/Users/admin/Desktop/c.png")
+    debug("/Users/admin/Desktop/c.png")
+    # debug("/Users/liuning/Desktop/d.png")
     # font_size(([30, 29], [521, 29], [521, 107], [30, 107]))
