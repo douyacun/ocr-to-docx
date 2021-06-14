@@ -1,3 +1,5 @@
+import logging
+
 import easyocr
 from docx import Document
 from docx.shared import Pt
@@ -9,42 +11,18 @@ DIFF = 2
 BASE_FONT_SIZE = 12
 
 
-def print_hi():
-    doc = Document()
-
-    doc.styles['Normal'].font.name = u'宋体'
-    doc.styles['Normal']._element.rPr.rFonts.set(qn('w:eastAsia'), u'宋体')
-    doc.styles['Normal'].font.size = Pt(BASE_FONT_SIZE)
-    parag = doc.add_paragraph("这部分内容根据在泡泡机器入的四期推送中正文前的絮叨以及与小伙伴们的互动整理而来")
-    parag.paragraph_format.first_line_indent = Pt(BASE_FONT_SIZE * 2)
-
-    # font_styles = doc.styles
-    # font_charstyle = font_styles.add_style('CommentsStyle', WD_STYLE_TYPE.CHARACTER)
-    # font_object = font_charstyle.font
-    # font_object.size = Pt(12)
-    # font_object.name = u'宋体'
-
-    # print(font_object.name)
-
-    # parag.add_run("this word document, was created using Times New Roman").bold = True
-    # run = parag.add_run("Python")
-
-    # print(run._element.rPr)
-
-    doc.save("test.docx")
-
-
 def read_image(filepath: str):
     reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
     res = reader.readtext(filepath)
     for v in res:
-        print(v)
+        logging.debug(v)
 
 
 @click.command()
 @click.argument("filepath")
 @click.argument("outfile")
 def detect_text(filepath, outfile):
+    logging.basicConfig(level="ERROR")
     reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
     result = reader.readtext(filepath)
 
@@ -76,7 +54,7 @@ def debug(filepath: str):
 
     for i in range(len(result)):
         (bbox, text, prob) = result[i]
-        print(f'text: {text} bbox: {bbox}')
+        logging.debug(f'text: {text} bbox: {bbox}')
 
 
 def merge_line(res):
@@ -88,15 +66,15 @@ def merge_line(res):
     """
     lineList = list()
     border = parse_border(res)
-    print(f"border: {border}")
+    logging.debug(f"border: {border}")
     fontList = parse_fontsize(res)
-    print(f"font: {fontList}")
+    logging.debug(f"font: {fontList}")
 
     line = {"text": "", "firstLineIndent": False, "fontSize": BASE_FONT_SIZE}
     for i in range(len(res)):
         (bbox, text, prob) = res[i]
         pos = parse_pos(bbox)
-        print(f"pos: {pos}")
+        logging.debug(f"pos: {pos}")
         prePos = parse_pos(res[i - 1][0])
         if i == 0:
             line["text"] = text
@@ -120,7 +98,7 @@ def merge_line(res):
     if line["text"] != "":
         lineList.append(line)
 
-    # print(lineList)
+    # logging.debug(lineList)
     return lineList
 
 
