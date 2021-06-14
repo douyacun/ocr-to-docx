@@ -1,3 +1,4 @@
+import json
 import logging
 
 import easyocr
@@ -33,7 +34,7 @@ def detect_text(filepath, outfile):
     doc.styles['Normal'].font.size = Pt(BASE_FONT_SIZE)
 
     lines = merge_line(result)
-    click.echo(result)
+    click.echo(json.dumps(lines))
 
     for line in lines:
         p = doc.add_paragraph()
