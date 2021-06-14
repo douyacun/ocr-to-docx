@@ -2,7 +2,7 @@ import easyocr
 from docx import Document
 from docx.shared import Pt
 from docx.oxml.ns import qn
-from docx.shared import Inches
+import click
 
 
 def print_hi():
@@ -37,7 +37,10 @@ def read_image(filepath: str):
         print(v)
 
 
-def detect_text(filepath: str):
+@click.command()
+@click.argument("filepath")
+@click.argument("outfile")
+def detect_text(filepath, outfile):
     reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
     result = reader.readtext(filepath)
 
@@ -47,18 +50,15 @@ def detect_text(filepath: str):
     doc.styles['Normal']._element.rPr.rFonts.set(qn('w:eastAsia'), u'宋体')
     doc.styles['Normal'].font.size = Pt(12)
 
-    # parag = doc.add_paragraph()
-
     lines = merge_line(result)
-    print(merge_line(result))
+    click.echo(result)
 
     for line in lines:
-        # parag.add_run(line).add_break()
         p = doc.add_paragraph(line["text"])
         if line["firstLineIndent"]:
             p.paragraph_format.first_line_indent = Pt(24)
 
-    doc.save("demo.docx")
+    doc.save(outfile)
 
 
 # 1. 统一字体，判断字体大小？
@@ -149,8 +149,4 @@ def parse_border(res):
 
 
 if __name__ == '__main__':
-    # print_hi()
-    detect_text("/Users/admin/Desktop/c.png")
-    # debug("/Users/admin/Desktop/c.png")
-    # debug("/Users/liuning/Desktop/d.png")
-    # font_size(([30, 29], [521, 29], [521, 107], [30, 107]))
+    detect_text()
