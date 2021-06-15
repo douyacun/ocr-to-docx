@@ -11,14 +11,6 @@ import click
 DIFF = 2
 BASE_FONT_SIZE = 12
 
-
-def read_image(filepath: str):
-    reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
-    res = reader.readtext(filepath)
-    for v in res:
-        logging.debug(v)
-
-
 @click.command()
 @click.argument("filepath")
 @click.argument("outfile")
