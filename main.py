@@ -8,13 +8,20 @@ from docx.oxml.ns import qn
 import math
 import click
 
-DIFF = 2
+DIFF = 10
 BASE_FONT_SIZE = 12
+FONT_DIFF = 5
 
-@click.command()
+
+@click.group()
+def handle():
+    pass
+
+
+@click.command("")
 @click.argument("filepath")
 @click.argument("outfile")
-def detect_text(filepath, outfile):
+def docx(filepath, outfile):
     logging.basicConfig(level="ERROR")
     reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
     result = reader.readtext(filepath)
@@ -37,17 +44,25 @@ def detect_text(filepath, outfile):
     doc.save(outfile)
 
 
+@click.command()
+@click.argument("filepath")
 # 1. 统一字体，判断字体大小？
 # 2. 行间距
 # 3. 横间距缩进
 # 4. 标点符号，转中文
-def debug(filepath: str):
+def debug(filepath):
+    logging.basicConfig(level="DEBUG")
     reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
     result = reader.readtext(filepath)
 
-    for i in range(len(result)):
-        (bbox, text, prob) = result[i]
-        logging.debug(f'text: {text} bbox: {bbox}')
+    # border = parse_border(result)
+    # logging.info(f"border: {border}")
+
+    # for i in range(len(result)):
+    #     (bbox, text, prob) = result[i]
+    #     logging.info(f'text: {text} bbox: {bbox}')
+
+    merge_line(result)
 
 
 def merge_line(res):
@@ -67,7 +82,7 @@ def merge_line(res):
     for i in range(len(res)):
         (bbox, text, prob) = res[i]
         pos = parse_pos(bbox)
-        logging.debug(f"pos: {pos}")
+        logging.debug(f"text {text} pos: {pos}")
         prePos = parse_pos(res[i - 1][0])
         if i == 0:
             line["text"] = text
@@ -80,7 +95,7 @@ def merge_line(res):
                 line["text"] += text
             else:
                 # 确定是否需要换行
-                if prePos["rightX"] >= border["right"] and pos["leftX"] <= border["left"]:
+                if prePos["rightX"] >= border["right"] or pos["leftX"] <= border["left"]:
                     line["text"] += text
                 else:
                     # 开头
@@ -116,14 +131,14 @@ def parse_fontsize(res) -> list:
         # 初始值
         if minHeight == 0:
             minHeight = k
-            font = {"minHeight": k, "maxHeight": k + 2, "fontSize": BASE_FONT_SIZE}
+            font = {"minHeight": k, "maxHeight": k + FONT_DIFF, "fontSize": BASE_FONT_SIZE}
             fontList.append(font)
             continue
 
-        if k > minHeight + DIFF:
+        if k > minHeight + FONT_DIFF:
             minHeight = k
             preFont = fontList[-1]
-            font = {"minHeight": k, "maxHeight": k + 2,
+            font = {"minHeight": k, "maxHeight": k + FONT_DIFF,
                     "fontSize": math.floor(k / preFont["minHeight"] * BASE_FONT_SIZE)}
             fontList.append(font)
     return fontList
@@ -158,10 +173,13 @@ def parse_border(res):
         right = max(right, top_right[0], bottom_right[0])
         left = min(left, top_left[0], bottom_left[0])
 
-    border["left"] = left - DIFF
+    border["left"] = left + DIFF
     border["right"] = right - DIFF
     return border
 
 
+handle.add_command(docx)
+handle.add_command(debug)
+
 if __name__ == '__main__':
-    detect_text()
+    handle()
