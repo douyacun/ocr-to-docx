@@ -10,7 +10,7 @@ import click
 
 DIFF = 10
 BASE_FONT_SIZE = 12
-FONT_DIFF = 5
+FONT_DIFF = 2
 
 
 @click.group()
@@ -39,6 +39,8 @@ def docx(filepath, outfile):
         p = doc.add_paragraph()
         if line["firstLineIndent"]:
             p.paragraph_format.first_line_indent = Pt(BASE_FONT_SIZE * 2)
+        if line["isCenter"]:
+            p.alignment = 1
         p.add_run(line["text"]).font.size = Pt(line["fontSize"])
 
     doc.save(outfile)
@@ -62,7 +64,7 @@ def debug(filepath):
     #     (bbox, text, prob) = result[i]
     #     logging.info(f'text: {text} bbox: {bbox}')
 
-    merge_line(result)
+    logging.debug(json.dumps(merge_line(result)))
 
 
 def merge_line(res):
@@ -78,7 +80,7 @@ def merge_line(res):
     fontList = parse_fontsize(res)
     logging.debug(f"font: {fontList}")
 
-    line = {"text": "", "firstLineIndent": False, "fontSize": BASE_FONT_SIZE}
+    line = {"text": "", "firstLineIndent": False, "fontSize": BASE_FONT_SIZE, "lineCount": 0, "isCenter": False}
     for i in range(len(res)):
         (bbox, text, prob) = res[i]
         pos = parse_pos(bbox)
@@ -87,6 +89,7 @@ def merge_line(res):
         if i == 0:
             line["text"] = text
             line["fontSize"] = get_fontsize(fontList, pos["height"])
+            line["lineCount"] += 1
             if pos["leftX"] > border["left"]:
                 line["firstLineIndent"] = True
         else:
@@ -95,14 +98,24 @@ def merge_line(res):
                 line["text"] += text
             else:
                 # 确定是否需要换行
-                if prePos["rightX"] >= border["right"] or pos["leftX"] <= border["left"]:
+                if prePos["rightX"] >= border["right"] and pos["leftX"] <= border["left"]:
+                    line["lineCount"] += 1
                     line["text"] += text
                 else:
-                    # 开头
+                    # 前一行入库
+                    if line["lineCount"] == 1:
+                        line["fontSize"] = get_fontsize(fontList, prePos["height"])
+                        if math.fabs(math.fabs(prePos["leftX"] - border["left"]) - math.fabs(
+                                prePos["rightX"] - border["right"])) <= 2:
+                            line["isCenter"] = True
+                            line["firstLineIndent"] = False
                     lineList.append(line)
-                    line = {"text": text, "firstLineIndent": False, "fontSize": get_fontsize(fontList, pos["height"])}
+                    # 开头
+                    line = {"text": text, "firstLineIndent": False, "fontSize": BASE_FONT_SIZE, "lineCount": 1,
+                            "isCenter": False}
                     if pos["leftX"] > border["left"]:
                         line["firstLineIndent"] = True
+
     if line["text"] != "":
         lineList.append(line)
 
@@ -124,22 +137,25 @@ def parse_fontsize(res) -> list:
     for i in range(len(res)):
         (bbox, text, prob) = res[i]
         pos = parse_pos(bbox)
-        heightDict[pos["height"]] = 1
+        if pos["height"] in heightDict:
+            heightDict[pos["height"]] += 1
+        else:
+            heightDict[pos["height"]] = 1
 
-    minHeight = 0
+    c = 0
+    baseHeight = 0
+    for k in sorted(heightDict.keys()):
+        if heightDict[k] > c:
+            c = heightDict[k]
+            baseHeight = k
+
+    font = {"minHeight": 0, "maxHeight": baseHeight, "fontSize": BASE_FONT_SIZE}
+    fontList.append(font)
     for k in sorted(heightDict.keys()):
         # 初始值
-        if minHeight == 0:
-            minHeight = k
-            font = {"minHeight": k, "maxHeight": k + FONT_DIFF, "fontSize": BASE_FONT_SIZE}
-            fontList.append(font)
-            continue
-
-        if k > minHeight + FONT_DIFF:
-            minHeight = k
-            preFont = fontList[-1]
+        if k > font["maxHeight"]:
             font = {"minHeight": k, "maxHeight": k + FONT_DIFF,
-                    "fontSize": math.floor(k / preFont["minHeight"] * BASE_FONT_SIZE)}
+                    "fontSize": math.floor(k / baseHeight * BASE_FONT_SIZE)}
             fontList.append(font)
     return fontList
 
