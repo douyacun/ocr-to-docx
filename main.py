@@ -8,7 +8,7 @@ from docx.oxml.ns import qn
 import math
 import click
 
-DIFF = 10
+DIFF = 20
 BASE_FONT_SIZE = 12
 FONT_DIFF = 2
 
@@ -54,17 +54,11 @@ def docx(filepath, outfile):
 # 4. 标点符号，转中文
 def debug(filepath):
     logging.basicConfig(level="DEBUG")
-    reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
-    result = reader.readtext(filepath)
+    # print(easyocr.__version__)
 
-    # border = parse_border(result)
-    # logging.info(f"border: {border}")
-
-    # for i in range(len(result)):
-    #     (bbox, text, prob) = result[i]
-    #     logging.info(f'text: {text} bbox: {bbox}')
-
-    logging.debug(json.dumps(merge_line(result)))
+    # reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
+    # result = reader.readtext(filepath)
+    # logging.debug(json.dumps(merge_line(result)))
 
 
 def merge_line(res):
@@ -105,8 +99,8 @@ def merge_line(res):
                     # 前一行入库
                     if line["lineCount"] == 1:
                         line["fontSize"] = get_fontsize(fontList, prePos["height"])
-                        if math.fabs(math.fabs(prePos["leftX"] - border["left"]) - math.fabs(
-                                prePos["rightX"] - border["right"])) <= 2:
+                        if math.fabs(prePos["leftX"] - border["left"]) > 200 and \
+                                math.fabs(prePos["rightX"] - border["right"]) > 200:
                             line["isCenter"] = True
                             line["firstLineIndent"] = False
                     lineList.append(line)
@@ -143,19 +137,19 @@ def parse_fontsize(res) -> list:
             heightDict[pos["height"]] = 1
 
     c = 0
-    baseHeight = 0
+    midHeight = 0  # 中分位高度
     for k in sorted(heightDict.keys()):
         if heightDict[k] > c:
             c = heightDict[k]
-            baseHeight = k
+            midHeight = k
 
-    font = {"minHeight": 0, "maxHeight": baseHeight, "fontSize": BASE_FONT_SIZE}
+    font = {"minHeight": 0, "maxHeight": midHeight, "fontSize": BASE_FONT_SIZE}
     fontList.append(font)
     for k in sorted(heightDict.keys()):
         # 初始值
         if k > font["maxHeight"]:
             font = {"minHeight": k, "maxHeight": k + FONT_DIFF,
-                    "fontSize": math.floor(k / baseHeight * BASE_FONT_SIZE)}
+                    "fontSize": math.floor(k / midHeight * BASE_FONT_SIZE)}
             fontList.append(font)
     return fontList
 
