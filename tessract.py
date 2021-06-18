@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 
 import pytesseract
@@ -6,6 +7,7 @@ from PIL import Image
 from xml.etree import ElementTree
 from word.word import NewDefaultPage
 from word.word import Word
+import click
 
 DIFF = 10
 FONT_SIZE = 12
@@ -17,10 +19,26 @@ def to_pdf(filepath):
         f.write(pdf)
 
 
-def image_hocr(filepath, outfile):
-    hocr = pytesseract.image_to_alto_xml(filepath, lang="chi_sim")
+@click.group()
+def handle():
+    pass
+
+
+@click.command("hocr_to_docx")
+@click.argument("filepath")
+@click.argument("outfile")
+@click.option("-debug", default=False)
+def hocr_to_docx(filepath, outfile, debug):
+    if debug:
+        logging.basicConfig(level="DEBUG")
+
+    hocr = pytesseract.image_to_alto_xml(filepath, lang="chi_sim+eng")
+
+    if debug:
+        with open('temp/hocr.xml', 'w+b') as f:
+            f.write(hocr)
     doc = parse_hocr_xml(hocr=hocr, filepath="")
-    print(json.dumps(doc))
+    click.echo(json.dumps(doc))
     doc["outfile"] = outfile
     Word(doc).write_docx().save()
 
@@ -41,10 +59,11 @@ def parse_hocr_xml(hocr, filepath):
 
 
 def merge_paragraph_line(page):
-    print(json.dumps(page))
-    print()
     border = parse_border(page)
-    # paragraphList = list()
+
+    logging.debug(json.dumps(page))
+    logging.debug(f"border: {border}")
+
     doc = NewDefaultPage()
     doc["font"] = u"宋体"
     doc["font_size"] = FONT_SIZE
@@ -76,7 +95,7 @@ def is_center(paragraph, border):
     if leftDiff <= DIFF or rightDiff <= DIFF:
         return False
 
-    if math.fabs(leftDiff - rightDiff) <= DIFF:
+    if math.fabs(leftDiff - rightDiff) <= DIFF * 2:
         return True
 
 
@@ -123,7 +142,13 @@ def detect_element(element: ElementTree.Element):
                         "right": int(textLine.attrib["HPOS"]) + int(textLine.attrib["WIDTH"])}
                 for str in textLine.findall(with_prefix(ns, "String")):
                     if str.attrib["CONTENT"].strip() != "":
-                        line["text"] += str.attrib["CONTENT"]
+                        content = str.attrib["CONTENT"]
+                        isAlpha = str.attrib["CONTENT"][0].encode("UTF-8").isalpha()
+                        if isAlpha:
+                            content += " "
+                            if len(line["text"]) > 0 and line["text"][-1] != " ":
+                                content = " " + content
+                        line["text"] += content
                 if line["text"] != "":
                     paragraph["lineList"].append(line)
             if len(paragraph["lineList"]):
@@ -167,5 +192,8 @@ def with_prefix(prefix, tag):
     return "{%s}%s" % (prefix, tag)
 
 
+handle.add_command(hocr_to_docx)
+
 if __name__ == '__main__':
-    image_hocr("/Users/liuning/Desktop/image-ocr/c.png", "temp/c.docx")
+    # image_hocr("/Users/liuning/Desktop/image-ocr/c.png", "temp/c.docx")
+    handle()
