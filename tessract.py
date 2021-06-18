@@ -4,9 +4,8 @@ import math
 import pytesseract
 from PIL import Image
 from xml.etree import ElementTree
-from docx import Document
-from docx.shared import Pt
-from docx.oxml.ns import qn
+from word.word import NewDefaultPage
+from word.word import Word
 
 DIFF = 10
 FONT_SIZE = 12
@@ -18,18 +17,18 @@ def to_pdf(filepath):
         f.write(pdf)
 
 
-def image_horce(filepath, outfile):
+def image_hocr(filepath, outfile):
     hocr = pytesseract.image_to_alto_xml(filepath, lang="chi_sim")
-    paragraph = parse_hocr_xml(hocr=hocr, filepath="")
-    print(json.dumps(paragraph))
-    to_docx(paragraph, outfile)
+    doc = parse_hocr_xml(hocr=hocr, filepath="")
+    print(json.dumps(doc))
+    doc["outfile"] = outfile
+    Word(doc).write_docx().save()
 
 
 def parse_hocr_xml(hocr, filepath):
     page = list()
     if hocr != "":
         root = ElementTree.fromstring(hocr)
-        # root = tree.getroot()
         page = detect_element(root)
 
     if filepath != "":
@@ -41,54 +40,28 @@ def parse_hocr_xml(hocr, filepath):
     return paragraph
 
 
-#
-# def to_docx(filepath):
-#     # Get HOCR output
-#     hocr = pytesseract.image_to_alto_xml(filepath, lang="chi_sim")
-#     with open('test.xml', 'w+b') as f:
-#         f.write(hocr)
-#     # parse_hocr_xml(hocr=hocr, filepath="")
-
-
-def to_docx(lines, outfile):
-    # logging.basicConfig(level="ERROR")
-    doc = Document()
-    doc.styles['Normal'].font.name = u'宋体'
-    doc.styles['Normal']._element.rPr.rFonts.set(qn('w:eastAsia'), u'宋体')
-    doc.styles['Normal'].font.size = Pt(FONT_SIZE)
-
-    # lines = merge_line(result)
-    # click.echo(json.dumps(lines))
-
-    for line in lines:
-        p = doc.add_paragraph()
-        if line["firstLineIndent"]:
-            p.paragraph_format.first_line_indent = Pt(FONT_SIZE * 2)
-        if line["isCenter"]:
-            p.alignment = 1
-        p.add_run(line["text"]).font.size = Pt(line["fontSize"])
-
-    doc.save(outfile)
-
-
 def merge_paragraph_line(page):
-    # print(json.dumps(page))
-    # print()
+    print(json.dumps(page))
+    print()
     border = parse_border(page)
-    paragraphList = list()
+    # paragraphList = list()
+    doc = NewDefaultPage()
+    doc["font"] = u"宋体"
+    doc["font_size"] = FONT_SIZE
+    doc["paragraph"] = []
 
     for p in page:
         isCenter = is_center(p, border)
         paragraph = {
-            "firstLineIndent": not isCenter and first_line_indent(p, border),
-            "isCenter": isCenter,
+            "first_line_indent": not isCenter and first_line_indent(p, border),
+            "is_center": isCenter,
             "text": "",
-            "fontSize": font_size(p, border)
+            "font_size": font_size(p, border)
         }
         for l in p["lineList"]:
             paragraph["text"] += l["text"]
-        paragraphList.append(paragraph)
-    return paragraphList
+        doc["paragraph"].append(paragraph)
+    return doc
 
 
 def is_center(paragraph, border):
@@ -149,11 +122,12 @@ def detect_element(element: ElementTree.Element):
                         "left": int(textLine.attrib["HPOS"]),
                         "right": int(textLine.attrib["HPOS"]) + int(textLine.attrib["WIDTH"])}
                 for str in textLine.findall(with_prefix(ns, "String")):
-                    # print(str.tag, str.attrib)
-                    if str.attrib["CONTENT"] != "":
+                    if str.attrib["CONTENT"].strip() != "":
                         line["text"] += str.attrib["CONTENT"]
-                paragraph["lineList"].append(line)
-            page.append(paragraph)
+                if line["text"] != "":
+                    paragraph["lineList"].append(line)
+            if len(paragraph["lineList"]):
+                page.append(paragraph)
 
     return page
 
@@ -194,5 +168,4 @@ def with_prefix(prefix, tag):
 
 
 if __name__ == '__main__':
-    image_horce("/Users/admin/Desktop/image-ocr/c.png", "temp/c.docx")
-    # parse_hocr_xml(filepath="temp/test.xml", hocr="")
+    image_hocr("/Users/liuning/Desktop/image-ocr/c.png", "temp/c.docx")
