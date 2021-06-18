@@ -33,7 +33,7 @@ class Paragraph:
             "is_center": False,
             "first_line_indent": False,
             "text": "",
-            "font_size": self.word.get_page_value("font")
+            "font_size": self.word.get_page_value("font_size")
         }
         if field in self.data:
             return self.data[field]

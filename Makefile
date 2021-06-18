@@ -1,14 +1,14 @@
 #inFile="/Users/admin/Desktop/image-ocr/c.png"
 #inFile="/Users/admin/Desktop/image-ocr/c.png"
-#inFile="/Users/admin/Desktop/image-ocr/g.png"
+inFile="/Users/admin/Desktop/image-ocr/f.png"
 
-inFile="/Users/liuning/Desktop/image-ocr/e.png"
+#inFile="/Users/liuning/Desktop/image-ocr/e.png"
 outFile=$(shell echo ${inFile}|sed 's!.png!.docx!g'|sed 's!.jpg!.docx!g'|sed 's!.jpeg!.docx!g')
 
 easyocr:
-	python main.py docx ${inFile} ${outFile}
+	python easy.py ocr_to_docx ${inFile} ${outFile}
 
-debug:
+easyocr-debug:
 	python main.py debug ${inFile}
 
 tessract:

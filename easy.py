@@ -1,12 +1,10 @@
 import json
 import logging
-
 import easyocr
-from docx import Document
-from docx.shared import Pt
-from docx.oxml.ns import qn
 import math
 import click
+from word.word import NewDefaultPage
+from word.word import Word
 
 DIFF = 20
 BASE_FONT_SIZE = 12
@@ -18,32 +16,20 @@ def handle():
     pass
 
 
-@click.command("")
+@click.command("ocr_to_docx")
 @click.argument("filepath")
 @click.argument("outfile")
-def docx(filepath, outfile):
+def ocr_to_docx(filepath, outfile):
     logging.basicConfig(level="ERROR")
     reader = easyocr.Reader(lang_list=['ch_sim', 'en'], gpu=False)
     result = reader.readtext(filepath)
 
-    doc = Document()
+    data = merge_line(result)
+    click.echo(json.dumps(data))
 
-    doc.styles['Normal'].font.name = u'宋体'
-    doc.styles['Normal']._element.rPr.rFonts.set(qn('w:eastAsia'), u'宋体')
-    doc.styles['Normal'].font.size = Pt(BASE_FONT_SIZE)
+    data["outfile"] = outfile
 
-    lines = merge_line(result)
-    click.echo(json.dumps(lines))
-
-    for line in lines:
-        p = doc.add_paragraph()
-        if line["firstLineIndent"]:
-            p.paragraph_format.first_line_indent = Pt(BASE_FONT_SIZE * 2)
-        if line["isCenter"]:
-            p.alignment = 1
-        p.add_run(line["text"]).font.size = Pt(line["fontSize"])
-
-    doc.save(outfile)
+    Word(data).write_docx().save()
 
 
 @click.command()
@@ -68,13 +54,15 @@ def merge_line(res):
     2. 判断是否需要换行，本行最后一个字没有达到最右侧边界
     3. 首行缩进？居中？
     """
+    page = NewDefaultPage()
     lineList = list()
     border = parse_border(res)
     logging.debug(f"border: {border}")
     fontList = parse_fontsize(res)
     logging.debug(f"font: {fontList}")
 
-    line = {"text": "", "firstLineIndent": False, "fontSize": BASE_FONT_SIZE, "lineCount": 0, "isCenter": False}
+    line = {"text": "", "first_line_indent": False, "font_size": BASE_FONT_SIZE, "line_count": 0, "is_center": False}
+
     for i in range(len(res)):
         (bbox, text, prob) = res[i]
         pos = parse_pos(bbox)
@@ -82,10 +70,10 @@ def merge_line(res):
         prePos = parse_pos(res[i - 1][0])
         if i == 0:
             line["text"] = text
-            line["fontSize"] = get_fontsize(fontList, pos["height"])
-            line["lineCount"] += 1
+            line["font_size"] = get_fontsize(fontList, pos["height"])
+            line["line_count"] += 1
             if pos["leftX"] > border["left"]:
-                line["firstLineIndent"] = True
+                line["first_line_indent"] = True
         else:
             # 在图片中可以确认是统一行
             if pos["topY"] <= prePos["topY"] + 2 or pos["bottomY"] <= prePos["bottomY"] + 2:
@@ -93,28 +81,28 @@ def merge_line(res):
             else:
                 # 确定是否需要换行
                 if prePos["rightX"] >= border["right"] and pos["leftX"] <= border["left"]:
-                    line["lineCount"] += 1
+                    line["line_count"] += 1
                     line["text"] += text
                 else:
                     # 前一行入库
-                    if line["lineCount"] == 1:
-                        line["fontSize"] = get_fontsize(fontList, prePos["height"])
+                    if line["line_count"] == 1:
+                        line["font_size"] = get_fontsize(fontList, prePos["height"])
                         if math.fabs(prePos["leftX"] - border["left"]) > 200 and \
                                 math.fabs(prePos["rightX"] - border["right"]) > 200:
-                            line["isCenter"] = True
-                            line["firstLineIndent"] = False
-                    lineList.append(line)
+                            line["is_center"] = True
+                            line["first_line_indent"] = False
+                    page["paragraph"].append(line)
                     # 开头
-                    line = {"text": text, "firstLineIndent": False, "fontSize": BASE_FONT_SIZE, "lineCount": 1,
-                            "isCenter": False}
+                    line = {"text": text, "first_line_indent": False, "font_size": BASE_FONT_SIZE, "line_count": 1,
+                            "is_center": False}
                     if pos["leftX"] > border["left"]:
-                        line["firstLineIndent"] = True
+                        line["first_line_indent"] = True
 
     if line["text"] != "":
-        lineList.append(line)
+        page["paragraph"].append(line)
 
     # logging.debug(lineList)
-    return lineList
+    return page
 
 
 def get_fontsize(fontList: list, height: int):
@@ -188,8 +176,8 @@ def parse_border(res):
     return border
 
 
-handle.add_command(docx)
-handle.add_command(debug)
+handle.add_command(ocr_to_docx)
+# handle.add_command(debug)
 
 if __name__ == '__main__':
     handle()
