@@ -12,7 +12,7 @@ easyocr-debug:
 	python main.py debug ${inFile}
 
 tessract:
-	python tessract.py hocr_to_docx ${inFile} ${outFile}
+	python3 tessract.py hocr_to_docx ${inFile} ${outFile}
 
 tessract-debug:
 	python tessract.py hocr_to_docx -debug=true ${inFile} ${outFile}
